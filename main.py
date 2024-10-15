@@ -146,7 +146,7 @@ def create_explanation_prompt(input_text, tfidf_data, topN_tfidf_data, model_nam
 
             Based on this information, explain to the user in non-technical terms:
             1. Provide summary of the provided text.
-                - A short concise summary in under 50 words.
+                - A short concise summary about the user selected model and model's prediction under 50 words.
             2. Identify the top reasons point wise for the model's predicted value from the individual tf-idf score contribution. Provide a brief explanation (within 50 words for each) of why these
                 features significantly influence the final prediction.
 
