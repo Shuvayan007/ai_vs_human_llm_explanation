@@ -12,6 +12,8 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import AzureChatOpenAI
 import os
 from constants import openai_key
+import tensorflow as tf
+
 # from streamlit import SessionState
 
 st.set_page_config(page_icon='🤖')
@@ -68,7 +70,10 @@ def preprocess_text(text):
 # Importing models, tf idf vectorizer
 lr = pickle.load(open('LogisticRegression.pkl', 'rb'))
 nb = pickle.load(open('NaiveBayes.pkl', 'rb'))
-rnn = pickle.load(open('RNN.pkl', 'rb'))
+try:
+    rnn = pickle.load(open('RNN.pkl', 'rb'))
+except:
+    rnn = tf.keras.models.load_model('RNN.h5')
 tfidf = pickle.load(open('TF-IDF_features.pkl', 'rb'))
 
 # y_pred = lr.predict('Hello')
