@@ -76,9 +76,126 @@ except:
     rnn = tf.keras.models.load_model('RNN.h5')
 tfidf = pickle.load(open('TF-IDF_features.pkl', 'rb'))
 
+
+#SHAP PART starts here-------------------------------------------------------------------------------------------------------
+shap_lr = pd.read_csv('shap_lr.csv')
+
+def feature_extraction(input_text):
+    input_text = preprocess_text(input_text)
+    X_test = pd.DataFrame()
+    word_feature = ['college','would', 'get', 'people', 'may']
+    features = {}
+    features['txt_len'] = len(input_text)
+    features['word_cnt'] = len(input_text.split())
+    for word in word_feature:
+      features[str(word) + '_freq'] = input_text.split().count(word) if isinstance(input_text, str) else 0
+    X_test = pd.DataFrame([features])
+    return X_test
+    # # Vectorize the text
+    # tfidf_vectors = vectorizer.transform([input_text])
+
+    # # Convert the sparse matrix to a dense array
+    # tfidf_array = tfidf_vectors.toarray()
+
+    # # Create a new dataframe with vectorized features
+    # vectorized_df = pd.DataFrame(tfidf_array)
+
+    # X_test = pd.concat([vectorized_df, X_test], axis=1)
+
+    
+
+def create_shap_prompt(input_text, prediction):
+    """
+    Create a prompt for the GPT model to generate an explanation.
+
+    Parameters:
+    data (DataFrame): Input features extracted from the user provided text in the app text field.
+    shap_data (DataFrame): The SHAP values for each feature.
+    input_text (str, mandatory): The input text provided by the application user, who wants to know if the provided text is AI generated or Human written.
+
+    Returns:
+    str: The generated prompt.
+    """
+
+    # processed_text = vectorizer.transform([input_text]).toarray()
+
+    processed_text = feature_extraction(input_text)
+    #predicting using Logistic Regression
+    # prediction = lr.predict(processed_text)
+
+    # Example confidence score (modify according to your model output)
+    # confidence = lr.predict_proba(processed_text)[0]
+    # predicted_value=data['predicted_churn'].values[n]
+    # shap = shap_data.iloc[n]
+    # dice = dice_data.iloc[n]
+
+    # Create a formatted string where each column name is followed by its value
+    input_string = ', '.join([f"{col}={value}" for col, value in processed_text.items()])
+    # coeff_string = ', '.join([f"{col}={value}" for col, value in coeff_data.items()])
+    shap_string = ', '.join([f"{col}={value}" for col, value in shap_lr.items()])
+    # dicestring = dice_data['changes'].values[n]
+
+    prompt = f"""
+            YOU ARE AN ASSISTANT TO THE USER OF TEXT CLASSIFICATION APPLICATION.
+
+            Here are the details for a machine learning model prediction the assistant is assisting:
+            - Input Text: {input_text}
+            - Feature extraction on the provided text : {input_string}
+            - Individual SHAP value contribution for each feature: {shap_string}
+            - Model's Predicted Class: {prediction}
+            - If the model prediction is '1' it's an AI Generated text, else it's a Human Written text.
+
+            Here is the data dicntionary for the dataset:
+            'txt_len': 'Length of the text (number of characters).',
+            'word_cnt': 'Number of words in the text.',
+            'people_freq': 'Frequency of the word 'people' in the text.',
+            'college_freq': 'Frequency of the word 'college' in the text.',
+            'may_freq': 'Frequency of the word 'may' in the text.',
+            'would_freq': 'Frequency of the word 'would' in the text.',
+            'get_freq': 'Frequency of the word 'get' in the text.',
+            'generated': What is the final prediction done by the model, if the model prediction is '1' it's an AI Generated text, else it's a Human Written text.
+
+
+
+
+            Based on this information, explain to the user in non-technical terms:
+            1. Identify only the top 3 reasons point wise for the model's predicted value from the individual shap contribution. Provide a brief explanation (within 50 words for each) of why these
+                features significantly influence the final prediction.
+
+
+            Remember:
+            - The magnitude of the coefficient value means that corresponding feature has a greater influence on the prediction.
+            - The magnitude of a SHAP value indicates the strength of a feature's influence on the prediction.
+            - **Positive SHAP values increase the likelihood of classification; negative values decrease it.**
+            - Recommendations should be strictly based on the information provided for the input text and model information.
+            """
+
+
+    return prompt
+
+def shap_agent_response(input_text, prediction):
+
+    """
+    Generate an agent response using the GPT model.
+
+    Parameters:
+    input_text (str, mandatory): The input text provided by the application user, who wants to know if the provided text is AI generated or Human written.
+    prediction (int, mandatory): The prediction value by the user's selected model.
+
+    Returns:
+    None
+    """
+
+    response=chain.invoke(create_shap_prompt(input_text, prediction))
+    parts = response.split('\n\n')
+
+    return parts
+
 # y_pred = lr.predict('Hello')
 
 # print(tfidf)
+
+# TF-IDF part starts here--------------------------------------------------------------------------------------
 
 #Takes vectorized text and N as input and outputs top N words with their respective TF-IDF score
 def topN_tfidf_scores(response, N):
@@ -153,8 +270,6 @@ def create_explanation_prompt(input_text, tfidf_data, topN_tfidf_data, model_nam
 
             Remember:
             - TF-IDF score reflects the importance of a word to a document in the given text.
-            2. What is the Logistic Regression model's predicted class and confidence score?
-            In prediction, confidence score format.
             - The magnitude of a TF-IDF score value indicates the strength of a feature's influence on the prediction.
             - **Positive TF-IDF score values increase the likelihood of classification; negative values decrease it.**
             - Recommendations should be strictly based on the information provided for the input text and model information.
@@ -207,7 +322,7 @@ st.title('Welcome to Text Classifier')
 txt = st.text_area('# Input Your Text')
 
 model = st.selectbox('Please select the model of your choice',
-                     ('Logistic Regression', 'Naive Bayes', 'RNN'))
+                     ('Logistic Regression', 'Naive Bayes', 'Recurrent Neural Network'))
 
 if model == 'Logistic Regression':
     selected_model = lr
@@ -225,6 +340,9 @@ else:
 if 'show_explain_button' not in st.session_state:
     st.session_state.show_explain_button = False
 
+# if 'show_tf-idf_button' not in st.session_state:
+#     st.session_state.show_tf-idf_button = False
+
 # Preparing input text to feed the model
 processed_text = preprocess_text(txt)
 input_text = [processed_text]
@@ -241,6 +359,8 @@ else:
 # if model == 'RNN':
 #     prediction = (prediction > 0.5).astype(int)[0]
 output_text = agent_response(vectorized_text, selected_model, prediction)
+
+shap_response = shap_agent_response(txt, prediction)
 
 if st.button('Submit'):
     if txt == '':
@@ -275,7 +395,7 @@ if st.button('Submit'):
             st.session_state.show_explain_button = True
 
 # prediction = selected_model.predict(vectorized_text)
-    
+
 if st.session_state.show_explain_button:
     # if st.button('Explain'):    
     if st.button('Explain using TF-IDF :face_with_one_eyebrow_raised:'):
@@ -284,4 +404,18 @@ if st.session_state.show_explain_button:
         for line in output_text:
             # print(line)
             st.write(line)
+    # st.session_state.show_tf-idf_button = True
     # st.session_state.show_explain_button = False
+
+
+
+# if st.session_state.show_tf-idf_button:
+if st.button('SHAP value contribution:male-detective:'):
+    # response=chain.invoke(create_shap_prompt(txt, prediction))
+    # response = shap_agent_response(txt, prediction)
+    # st.write(response)
+    if model == 'Logistic Regression':
+        for line in shap_response:
+            st.write(line)
+    else:
+        st.error("Feature not available yet!")
