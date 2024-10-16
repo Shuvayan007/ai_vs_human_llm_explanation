@@ -340,6 +340,10 @@ else:
 if 'show_explain_button' not in st.session_state:
     st.session_state.show_explain_button = False
 
+#Newly added
+if 'show_shap_button' not in st.session_state:
+  st.session_state.show_shap_button = False
+
 # if 'show_tf-idf_button' not in st.session_state:
 #     st.session_state.show_tf-idf_button = False
 
@@ -347,18 +351,19 @@ if 'show_explain_button' not in st.session_state:
 processed_text = preprocess_text(txt)
 input_text = [processed_text]
 vectorized_text = tfidf.transform(input_text)
-if model == 'RNN':
+if model == 'Recurrent Neural Network':
     vectorized_text_rnn = vectorized_text.toarray()
     # print(vectorized_text.shape)
     rnn_input = vectorized_text_rnn.reshape(vectorized_text_rnn.shape[0],1, vectorized_text_rnn.shape[1])
     prediction = selected_model.predict(rnn_input)
     prediction = (prediction > 0.5).astype(int)[0]
+    output_text = agent_response(rnn_input, selected_model, prediction)
 else:
     prediction = selected_model.predict(vectorized_text)
 # time.sleep(1)
 # if model == 'RNN':
 #     prediction = (prediction > 0.5).astype(int)[0]
-output_text = agent_response(vectorized_text, selected_model, prediction)
+    output_text = agent_response(vectorized_text, selected_model, prediction)
 
 shap_response = shap_agent_response(txt, prediction)
 
@@ -404,18 +409,22 @@ if st.session_state.show_explain_button:
         for line in output_text:
             # print(line)
             st.write(line)
+        st.session_state.show_shap_button = True
     # st.session_state.show_tf-idf_button = True
     # st.session_state.show_explain_button = False
 
 
 
 # if st.session_state.show_tf-idf_button:
-if st.button('SHAP value contribution:male-detective:'):
-    # response=chain.invoke(create_shap_prompt(txt, prediction))
-    # response = shap_agent_response(txt, prediction)
-    # st.write(response)
-    if model == 'Logistic Regression':
-        for line in shap_response:
-            st.write(line)
-    else:
-        st.error("Feature not available yet!")
+if st.session_state.show_shap_button:
+    if st.button('SHAP value contribution:male-detective:'):
+        # response=chain.invoke(create_shap_prompt(txt, prediction))
+        # response = shap_agent_response(txt, prediction)
+        # st.write(response)
+        if model == 'Logistic Regression':
+            for line in shap_response:
+                st.write(line)
+            st.image('shap_plot_lr.jpg')
+
+        else:
+            st.error("Feature not available yet!")
