@@ -408,7 +408,7 @@ if model == 'Recurrent Neural Network':
     # print(vectorized_text.shape)
     rnn_input = vectorized_text_rnn.reshape(vectorized_text_rnn.shape[0],1, vectorized_text_rnn.shape[1])
     prediction = selected_model.predict(rnn_input)
-    prediction = (prediction > 0.5).astype(int)[0]
+    output_text = agent_response(rnn_input, selected_model, prediction)
 else:
     prediction = selected_model.predict(vectorized_text)
 # time.sleep(1)
@@ -465,12 +465,20 @@ if st.session_state.show_explain_button:
 
 
 # if st.session_state.show_tf-idf_button:
-if st.button('SHAP value contribution:male-detective:'):
-    # response=chain.invoke(create_shap_prompt(txt, prediction))
-    # response = shap_agent_response(txt, prediction)
-    # st.write(response)
-    if model == 'Logistic Regression':
-        for line in shap_response:
-            st.write(line)
-    else:
-        st.error("Feature not available yet!")
+if st.session_state.show_shap_button:
+    if st.button('SHAP value contribution:male-detective:'):
+        # response=chain.invoke(create_shap_prompt(txt, prediction))
+        # response = shap_agent_response(txt, prediction)
+        # st.write(response)
+        if model != 'Recurrent Neural Network':
+            shap_response = shap_agent_response(txt, prediction)
+            if model == 'Logistic Regression':
+                for line in shap_response:
+                    st.write(line)
+                st.image('shap_plot_lr.jpg')
+            elif model == 'Naive Bayes':
+                for line in shap_response:
+                    st.write(line)
+                st.image('shap_plot_NB_ai.jpg')
+        else:
+            st.error("Feature not available yet!")
