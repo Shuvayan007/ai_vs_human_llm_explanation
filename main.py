@@ -296,6 +296,7 @@ def create_explanation_prompt(input_text, tfidf_data, topN_tfidf_data, model_nam
     # Example confidence score (modify according to your model output)
     try:
         confidence = model_name.predict_proba(vectorized_text)[0]
+        confidence = confidence*100
     except:
         if prediction > 0.5:
             confidence = prediction.item()*100  
@@ -435,8 +436,8 @@ if st.button('Submit'):
             # prediction = selected_model.predict(vectorized_text)
             # output_text = agent_response(vectorized_text, model, prediction)
             # time.sleep(1)
-            # if model == 'RNN':
-            #     prediction = (prediction > 0.5).astype(int)[0]
+            if model == 'Recurrent Neural Network':
+                prediction = (prediction > 0.5).astype(int)[0]
 
             if prediction[0] == 0:
                 st.success("It's a Human written text :male-astronaut::male-scientist:")
