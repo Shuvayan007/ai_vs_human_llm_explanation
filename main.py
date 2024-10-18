@@ -76,9 +76,25 @@ except:
     rnn = tf.keras.models.load_model('RNN.h5')
 tfidf = pickle.load(open('TF-IDF_features.pkl', 'rb'))
 
+st.title('Welcome to Text Classifier')
+txt = st.text_area('# Input Your Text')
+
+model = st.selectbox('Please select the model of your choice',
+                     ('Logistic Regression', 'Naive Bayes', 'Recurrent Neural Network'))
+
+if model == 'Logistic Regression':
+    selected_model = lr
+elif model == 'Naive Bayes':
+    selected_model = nb
+else:
+    selected_model = rnn
+
 
 #SHAP PART starts here-------------------------------------------------------------------------------------------------------
 shap_lr = pd.read_csv('shap_lr.csv')
+shap_NB_ai = pd.read_csv('shap_NB_ai.csv')
+shap_NB_human = pd.read_csv('shap_NB_human.csv')
+
 
 def feature_extraction(input_text):
     input_text = preprocess_text(input_text)
@@ -91,26 +107,15 @@ def feature_extraction(input_text):
       features[str(word) + '_freq'] = input_text.split().count(word) if isinstance(input_text, str) else 0
     X_test = pd.DataFrame([features])
     return X_test
-    # # Vectorize the text
-    # tfidf_vectors = vectorizer.transform([input_text])
 
-    # # Convert the sparse matrix to a dense array
-    # tfidf_array = tfidf_vectors.toarray()
-
-    # # Create a new dataframe with vectorized features
-    # vectorized_df = pd.DataFrame(tfidf_array)
-
-    # X_test = pd.concat([vectorized_df, X_test], axis=1)
-
-    
-
-def create_shap_prompt(input_text, prediction):
+def create_NB_shap_prompt(input_text, prediction):
     """
     Create a prompt for the GPT model to generate an explanation.
 
     Parameters:
     data (DataFrame): Input features extracted from the user provided text in the app text field.
-    shap_data (DataFrame): The SHAP values for each feature.
+    shap_data_ai (DataFrame): The SHAP values for each feature contributing to AI-generated text class.
+    shap_data_human (DataFrame): The SHAP values for each feature contributing to Human written text class.
     input_text (str, mandatory): The input text provided by the application user, who wants to know if the provided text is AI generated or Human written.
 
     Returns:
@@ -120,20 +125,12 @@ def create_shap_prompt(input_text, prediction):
     # processed_text = vectorizer.transform([input_text]).toarray()
 
     processed_text = feature_extraction(input_text)
-    #predicting using Logistic Regression
-    # prediction = lr.predict(processed_text)
-
-    # Example confidence score (modify according to your model output)
-    # confidence = lr.predict_proba(processed_text)[0]
-    # predicted_value=data['predicted_churn'].values[n]
-    # shap = shap_data.iloc[n]
-    # dice = dice_data.iloc[n]
 
     # Create a formatted string where each column name is followed by its value
     input_string = ', '.join([f"{col}={value}" for col, value in processed_text.items()])
     # coeff_string = ', '.join([f"{col}={value}" for col, value in coeff_data.items()])
-    shap_string = ', '.join([f"{col}={value}" for col, value in shap_lr.items()])
-    # dicestring = dice_data['changes'].values[n]
+    shap_string_ai = ', '.join([f"{col}={value}" for col, value in shap_NB_ai.items()])
+    shap_string_human = ', '.join([f"{col}={value}" for col, value in shap_NB_human.items()])
 
     prompt = f"""
             YOU ARE AN ASSISTANT TO THE USER OF TEXT CLASSIFICATION APPLICATION.
@@ -141,7 +138,9 @@ def create_shap_prompt(input_text, prediction):
             Here are the details for a machine learning model prediction the assistant is assisting:
             - Input Text: {input_text}
             - Feature extraction on the provided text : {input_string}
-            - Individual SHAP value contribution for each feature: {shap_string}
+            - Individual SHAP value contribution of each feature for AI-generated class: {shap_string_ai}
+            - Individual SHAP value contribution of each feature for Human written class: {shap_string_human}
+            - Machine learning model name that user selected: {model}
             - Model's Predicted Class: {prediction}
             - If the model prediction is '1' it's an AI Generated text, else it's a Human Written text.
 
@@ -164,7 +163,68 @@ def create_shap_prompt(input_text, prediction):
 
 
             Remember:
-            - The magnitude of the coefficient value means that corresponding feature has a greater influence on the prediction.
+            - The high magnitude of the coefficient value means that corresponding feature has a greater influence on the prediction.
+            - The magnitude of a SHAP value indicates the strength of a feature's influence on the prediction.
+            - **Positive SHAP values increase the likelihood of classification; negative values decrease it.**
+            - Recommendations should be strictly based on the information provided for the input text and model information.
+            """
+
+
+    return prompt
+
+def create_lr_shap_prompt(input_text, prediction):
+    """
+    Create a prompt for the GPT model to generate an explanation.
+
+    Parameters:
+    data (DataFrame): Input features extracted from the user provided text in the app text field.
+    shap_data (DataFrame): The SHAP values for each feature.
+    input_text (str, mandatory): The input text provided by the application user, who wants to know if the provided text is AI generated or Human written.
+
+    Returns:
+    str: The generated prompt.
+    """
+
+    # processed_text = vectorizer.transform([input_text]).toarray()
+
+    processed_text = feature_extraction(input_text)
+
+    # Create a formatted string where each column name is followed by its value
+    input_string = ', '.join([f"{col}={value}" for col, value in processed_text.items()])
+    # coeff_string = ', '.join([f"{col}={value}" for col, value in coeff_data.items()])
+    shap_string = ', '.join([f"{col}={value}" for col, value in shap_lr.items()])
+
+    prompt = f"""
+            YOU ARE AN ASSISTANT TO THE USER OF TEXT CLASSIFICATION APPLICATION.
+
+            Here are the details for a machine learning model prediction the assistant is assisting:
+            - Input Text: {input_text}
+            - Feature extraction on the provided text : {input_string}
+            - Individual SHAP value contribution for each feature: {shap_string}
+            - Machine learning model name that user selected: {model}
+            - Model's Predicted Class: {prediction}
+            - If the model prediction is '1' it's an AI Generated text, else it's a Human Written text.
+
+            Here is the data dicntionary for the dataset:
+            'txt_len': 'Length of the text (number of characters).',
+            'word_cnt': 'Number of words in the text.',
+            'people_freq': 'Frequency of the word 'people' in the text.',
+            'college_freq': 'Frequency of the word 'college' in the text.',
+            'may_freq': 'Frequency of the word 'may' in the text.',
+            'would_freq': 'Frequency of the word 'would' in the text.',
+            'get_freq': 'Frequency of the word 'get' in the text.',
+            'generated': What is the final prediction done by the model, if the model prediction is '1' it's an AI Generated text, else it's a Human Written text.
+
+
+
+
+            Based on this information, explain to the user in non-technical terms:
+            1. Identify only the top 3 reasons point wise for the model's predicted value from the individual shap contribution. Provide a brief explanation (within 50 words for each) of why these
+                features significantly influence the final prediction.
+
+
+            Remember:
+            - The high magnitude of the coefficient value means that corresponding feature has a greater influence on the prediction.
             - The magnitude of a SHAP value indicates the strength of a feature's influence on the prediction.
             - **Positive SHAP values increase the likelihood of classification; negative values decrease it.**
             - Recommendations should be strictly based on the information provided for the input text and model information.
@@ -185,15 +245,19 @@ def shap_agent_response(input_text, prediction):
     Returns:
     None
     """
+    # if model == 'Logistic Regression':
+    # selected_model = lr
 
-    response=chain.invoke(create_shap_prompt(input_text, prediction))
+    # selected_model = nb
+
+    if model == 'Logistic Regression':
+        response=chain.invoke(create_lr_shap_prompt(input_text, prediction))
+    elif model == 'Naive Bayes':
+        response=chain.invoke(create_NB_shap_prompt(input_text, prediction))
     parts = response.split('\n\n')
 
     return parts
 
-# y_pred = lr.predict('Hello')
-
-# print(tfidf)
 
 # TF-IDF part starts here--------------------------------------------------------------------------------------
 
@@ -233,7 +297,11 @@ def create_explanation_prompt(input_text, tfidf_data, topN_tfidf_data, model_nam
     try:
         confidence = model_name.predict_proba(vectorized_text)[0]
     except:
-        confidence = 'Yet to calculate'
+        if prediction > 0.5:
+            confidence = prediction.item()*100  
+        else:
+            confidence = (1-prediction.item())*100
+        prediction = (prediction > 0.5).astype(int)[0]
 
     # Create a formatted string where each column name is followed by its value
     # tfidf_string = ', '.join([f"{col}={value}" for col, value in tfidf_data.items()])
@@ -253,7 +321,7 @@ def create_explanation_prompt(input_text, tfidf_data, topN_tfidf_data, model_nam
             Here are the details for a machine learning model prediction the assistant is assisting:
             - Input Text: {input_text}
             - TF-IDF scores for all words in the input text: {tfidf_string} 
-            - Machine learning model name that user selected: {model_name}
+            - Machine learning model name that user selected: {model}
             - Model's Predicted Class: {prediction}
             - Model's confidence score for the prediction: {confidence}
             - If the model prediction is '1' it's an AI Generated text, else it's a Human Written text.
@@ -301,6 +369,8 @@ def agent_response(input_text, model_name, prediction):
 
     return parts
 
+# Azure OpenAI setup starts from here----------------------------------------------------------------------
+
 #Storing my API key in the environment variable
 os.environ["OPENAI_API_KEY"] = openai_key
 
@@ -317,28 +387,14 @@ chain = (
     | StrOutputParser()
 )
 
-# print(df)
-st.title('Welcome to Text Classifier')
-txt = st.text_area('# Input Your Text')
-
-model = st.selectbox('Please select the model of your choice',
-                     ('Logistic Regression', 'Naive Bayes', 'Recurrent Neural Network'))
-
-if model == 'Logistic Regression':
-    selected_model = lr
-elif model == 'Naive Bayes':
-    selected_model = nb
-else:
-    selected_model = rnn
-
-# flag = False
-
-# if submit.button('Submit'):
-#     ss.submit = True
 
 # Initialize session state for the 'explain' button visibility
 if 'show_explain_button' not in st.session_state:
     st.session_state.show_explain_button = False
+
+#Newly added
+if 'show_shap_button' not in st.session_state:
+  st.session_state.show_shap_button = False
 
 # if 'show_tf-idf_button' not in st.session_state:
 #     st.session_state.show_tf-idf_button = False
@@ -347,20 +403,18 @@ if 'show_explain_button' not in st.session_state:
 processed_text = preprocess_text(txt)
 input_text = [processed_text]
 vectorized_text = tfidf.transform(input_text)
-if model == 'RNN':
+if model == 'Recurrent Neural Network':
     vectorized_text_rnn = vectorized_text.toarray()
     # print(vectorized_text.shape)
     rnn_input = vectorized_text_rnn.reshape(vectorized_text_rnn.shape[0],1, vectorized_text_rnn.shape[1])
     prediction = selected_model.predict(rnn_input)
-    prediction = (prediction > 0.5).astype(int)[0]
+    output_text = agent_response(rnn_input, selected_model, prediction)
 else:
     prediction = selected_model.predict(vectorized_text)
 # time.sleep(1)
 # if model == 'RNN':
 #     prediction = (prediction > 0.5).astype(int)[0]
-output_text = agent_response(vectorized_text, selected_model, prediction)
-
-shap_response = shap_agent_response(txt, prediction)
+    output_text = agent_response(vectorized_text, selected_model, prediction)
 
 if st.button('Submit'):
     if txt == '':
@@ -404,18 +458,27 @@ if st.session_state.show_explain_button:
         for line in output_text:
             # print(line)
             st.write(line)
+        st.session_state.show_shap_button = True
     # st.session_state.show_tf-idf_button = True
     # st.session_state.show_explain_button = False
 
 
 
 # if st.session_state.show_tf-idf_button:
-if st.button('SHAP value contribution:male-detective:'):
-    # response=chain.invoke(create_shap_prompt(txt, prediction))
-    # response = shap_agent_response(txt, prediction)
-    # st.write(response)
-    if model == 'Logistic Regression':
-        for line in shap_response:
-            st.write(line)
-    else:
-        st.error("Feature not available yet!")
+if st.session_state.show_shap_button:
+    if st.button('SHAP value contribution:male-detective:'):
+        # response=chain.invoke(create_shap_prompt(txt, prediction))
+        # response = shap_agent_response(txt, prediction)
+        # st.write(response)
+        if model != 'Recurrent Neural Network':
+            shap_response = shap_agent_response(txt, prediction)
+            if model == 'Logistic Regression':
+                for line in shap_response:
+                    st.write(line)
+                st.image('shap_plot_lr.jpg')
+            elif model == 'Naive Bayes':
+                for line in shap_response:
+                    st.write(line)
+                st.image('shap_plot_NB_ai.jpg')
+        else:
+            st.error("Feature not available yet!")
